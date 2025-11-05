@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Expression-Based Interrogation Analyzer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="frame-container">
+        <div class="frame-header">
+            <div class="brand-block">
+                <img src="{{ url_for('serve_logo') }}" alt="Interrogation Analyzer Logo" class="brand-logo">
+                <div class="brand-meta">
+                    <h1 class="brand-title">Analyze Vision</h1>
+                    <p class="brand-tagline">Real-time multi-modal deception analytics</p>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-chip">
+                    <span class="chip-label">Session Status</span>
+                    <span class="chip-value" id="session-status">Session ready • Baseline not set</span>
+                </div>
+                <div class="status-chip">
+                    <span class="chip-label">Elapsed</span>
+                    <span class="chip-value" id="time-elapsed">00:00:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="frame-main">
+            <div class="dashboard-grid">
+                <section class="panel video-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Live Interrogation Feed</h2>
+                            <p class="panel-subtitle">Monitor posture, micro-expressions, and vocal stress signals in real time.</p>
+                        </div>
+                        <div class="panel-meta">
+                            <div class="meta-pill">
+                                <span class="meta-label">Baseline</span>
+                                <span class="status-badge inactive" id="quick-baseline">Pending</span>
+                            </div>
+                            <div class="meta-pill">
+                                <span class="meta-label">Audio Samples</span>
+                                <span class="metric-value" id="quick-audio-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="video-wrapper">
+                        <img id="video-stream" src="{{ url_for('video_feed') }}" alt="Live interrogation stream">
+                    </div>
+                    <div class="control-grid">
+                        <button id="btn-start">Start Session</button>
+                        <button id="btn-baseline" disabled>Capture Baseline</button>
+                        <button id="btn-analyze" disabled>Begin Analysis</button>
+                        <button id="btn-save" disabled>Save Evidence</button>
+                    </div>
+                </section>
+
+                <section class="panel insights-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Insight Overview</h2>
+                            <p class="panel-subtitle">Current emotional posture and behavioral signals.</p>
+                        </div>
+                    </div>
+
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <span class="status-label">Current Emotion</span>
+                            <span class="status-value" id="current-emotion">None</span>
+                        </div>
+                        <div class="status-card">
+                            <span class="status-label">Confidence Level</span>
+                            <span class="status-value" id="confidence">-</span>
+                        </div>
+                        <div class="status-card">
+                            <span class="status-label">Stress Level</span>
+                            <span class="status-value" id="stress-level">-</span>
+                        </div>
+                        <div class="status-card">
+                            <span class="status-label">Microexpression Risk</span>
+                            <span class="status-value" id="microexpression-risk">-</span>
+                        </div>
+                    </div>
+
+                    <div class="emotion-table">
+                        <div class="emotion-table__header">
+                            <span>Top Emotions</span>
+                            <span>Confidence</span>
+                        </div>
+                        <div class="emotion-row">
+                            <span id="top-emotion-1-name">-</span>
+                            <span id="top-emotion-1-value">0%</span>
+                        </div>
+                        <div class="emotion-row">
+                            <span id="top-emotion-2-name">-</span>
+                            <span id="top-emotion-2-value">0%</span>
+                        </div>
+                        <div class="emotion-row">
+                            <span id="top-emotion-3-name">-</span>
+                            <span id="top-emotion-3-value">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="insight-grid">
+                        <div class="insight-section">
+                            <div class="insight-title">Posture Insights</div>
+                            <div class="insight-row"><span>Lean</span><span id="pose-lean" class="status-badge inactive">Neutral</span></div>
+                            <div class="insight-row"><span>Head Tilt</span><span id="pose-head-tilt" class="metric-value">0°</span></div>
+                            <div class="insight-row"><span>Shoulder Δ</span><span id="pose-shoulder" class="metric-value">0</span></div>
+                        </div>
+                        <div class="insight-section">
+                            <div class="insight-title">Eye Behavior</div>
+                            <div class="insight-row"><span>Blinks</span><span id="eye-blink-count" class="metric-value">0</span></div>
+                            <div class="insight-row"><span>Blink Rate</span><span id="eye-blink-rate" class="metric-value">0 / min</span></div>
+                            <div class="insight-row"><span>Eye Aspect</span><span id="eye-ear" class="metric-subtle">-</span></div>
+                        </div>
+                        <div class="insight-section">
+                            <div class="insight-title">Gesture Activity</div>
+                            <div class="insight-row"><span>Hands Seen</span><span id="gesture-hand-count" class="metric-value">0</span></div>
+                            <div class="insight-row"><span>Near Face</span><span id="gesture-hand-face" class="status-badge inactive">No</span></div>
+                        </div>
+                        <div class="insight-section">
+                            <div class="insight-title">Audio Insights</div>
+                            <div class="insight-row"><span>Status</span><span id="audio-status" class="status-badge inactive">Inactive</span></div>
+                            <div class="insight-row"><span>Energy</span><span id="audio-energy" class="metric-value">-</span></div>
+                            <div class="insight-row"><span>Pitch (Hz)</span><span id="audio-pitch" class="metric-value">-</span></div>
+                            <div class="insight-row"><span>Speech Rate</span><span id="audio-speech-rate" class="metric-value">-</span></div>
+                            <div class="insight-row"><span>Voice Tremor</span><span id="audio-tremor" class="metric-value">-</span></div>
+                            <div class="insight-row"><span>Voice Activity</span><span id="audio-activity" class="status-badge inactive">Calm</span></div>
+                            <div class="insight-row"><span>Baseline Energy Avg</span><span id="audio-baseline-energy" class="metric-subtle">-</span></div>
+                            <div class="insight-row"><span>Baseline Samples</span><span id="audio-baseline-count" class="metric-subtle">0</span></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <section class="panel timeline-panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Emotion Timeline</h2>
+                        <p class="panel-subtitle">Track shifts across baseline and interrogation phases.</p>
+                    </div>
+                </div>
+                <div class="timeline-chart">
+                    <canvas id="emotionChart" height="80"></canvas>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:6060';
+        
+        let emotionChart;
+        let statsInterval;
+        let sessionActive = false;
+
+        const formatNumber = (value, digits = 2) => {
+            if (value === null || value === undefined) return '-';
+            const num = Number(value);
+            return Number.isFinite(num) ? num.toFixed(digits) : '-';
+        };
+
+        const setBadgeState = (element, state, text) => {
+            if (!element) return;
+            element.classList.remove('active', 'inactive', 'alert');
+            if (state) {
+                element.classList.add(state);
+            }
+            if (text !== undefined) {
+                element.textContent = text;
+            }
+        };
+
+        function initChart() {
+            const ctx = document.getElementById('emotionChart').getContext('2d');
+            emotionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Happy',
+                            borderColor: '#3df793',
+                            backgroundColor: 'rgba(61,247,147,0.09)',
+                            data: [],
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Sad',
+                            borderColor: '#f85e7f',
+                            backgroundColor: 'rgba(248,94,127,0.09)',
+                            data: [],
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Fear',
+                            borderColor: '#78bfff',
+                            backgroundColor: 'rgba(120,191,255,0.09)',
+                            data: [],
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { 
+                                color: '#dde5fa', 
+                                font: { size: 14 } 
+                            },
+                            position: 'top',
+                            padding: 8,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { 
+                                color: '#b0cdff', 
+                                font: { size: 12 },
+                                maxTicksLimit: 10
+                            },
+                            grid: { color: 'rgba(50,55,70,0.68)' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { 
+                                color: '#b0cdff', 
+                                font: { size: 12 } 
+                            },
+                            grid: { color: 'rgba(50,55,70,0.68)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        document.getElementById('btn-start').onclick = async () => {
+            const subjectId = prompt('Enter Subject ID:', 'SUBJECT_001');
+            if (!subjectId) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/start_session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject_id: subjectId })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✓ Session started: ${data.session_id}`);
+                    sessionActive = true;
+                    document.getElementById('btn-baseline').disabled = false;
+                    document.getElementById('session-status').textContent = 'Session active • Ready for baseline';
+                    document.getElementById('time-elapsed').textContent = '00:00:00';
+                    document.getElementById('quick-audio-count').textContent = '0';
+                    setBadgeState(document.getElementById('quick-baseline'), 'inactive', 'Pending');
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to connect to backend: ' + error);
+            }
+        };
+
+        document.getElementById('btn-baseline').onclick = async () => {
+            try {
+                const response = await fetch(`${API_BASE}/start_baseline`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✓ Baseline capture started (30 seconds)');
+                    document.getElementById('session-status').textContent = 'Capturing baseline... (30s)';
+                    setBadgeState(document.getElementById('quick-baseline'), 'active', 'Capturing');
+                    
+                    setTimeout(() => {
+                        document.getElementById('btn-analyze').disabled = false;
+                        document.getElementById('session-status').textContent = 'Baseline captured • Ready to analyze';
+                        setBadgeState(document.getElementById('quick-baseline'), 'active', 'Captured');
+                    }, 30000);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to start baseline: ' + error);
+            }
+        };
+
+        document.getElementById('btn-analyze').onclick = async () => {
+            try {
+                const response = await fetch(`${API_BASE}/start_analysis`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✓ Analysis started');
+                    document.getElementById('btn-save').disabled = false;
+                    document.getElementById('session-status').textContent = 'Analysis in progress...';
+                    startStatsPolling();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to start analysis: ' + error);
+            }
+        };
+
+        document.getElementById('btn-save').onclick = async () => {
+            try {
+                const response = await fetch(`${API_BASE}/save_report`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✓ Report saved successfully!\n\nFiles: ' + data.files.join('\n'));
+                    document.getElementById('session-status').textContent = 'Report saved';
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Failed to save report: ' + error);
+            }
+        };
+
+        function startStatsPolling() {
+            if (statsInterval) clearInterval(statsInterval);
+            
+            statsInterval = setInterval(async () => {
+                await updateStats();
+                await updateGraph();
+            }, 2000); 
+        }
+
+        async function updateStats() {
+            try {
+                const response = await fetch(`${API_BASE}/get_stats`);
+                const stats = await response.json();
+                
+                if (stats.error) return;
+
+                const currentEmotion = stats.current_emotion.charAt(0).toUpperCase() + stats.current_emotion.slice(1);
+                document.getElementById('current-emotion').textContent = currentEmotion;
+
+                if (stats.top_emotions && stats.top_emotions.length >= 3) {
+                    for (let i = 0; i < 3; i++) {
+                        const emotion = stats.top_emotions[i];
+                        const emotionName = emotion.name.charAt(0).toUpperCase() + emotion.name.slice(1);
+                        document.getElementById(`top-emotion-${i+1}-name`).textContent = emotionName;
+                        document.getElementById(`top-emotion-${i+1}-value`).textContent = `${emotion.value}%`;
+                    }
+                }
+
+                document.getElementById('confidence').textContent = stats.confidence;
+                document.getElementById('stress-level').textContent = stats.stress_level;
+                document.getElementById('microexpression-risk').textContent = stats.microexpression_risk;
+
+                const analyzerSummary = stats.analyzers || {};
+                const pose = analyzerSummary.pose || {};
+                const eye = analyzerSummary.eye || {};
+                const gesture = analyzerSummary.gesture || {};
+
+                const leanStatus = pose.lean_forward ? 'Forward' : pose.lean_backward ? 'Backward' : 'Neutral';
+                const poseLeanEl = document.getElementById('pose-lean');
+                const leanState = pose.lean_forward || pose.lean_backward ? 'active' : 'inactive';
+                setBadgeState(poseLeanEl, leanState, leanStatus);
+                document.getElementById('pose-head-tilt').textContent = pose.head_tilt_deg !== undefined ? `${pose.head_tilt_deg}°` : '-';
+                document.getElementById('pose-shoulder').textContent = pose.shoulder_asymmetry !== undefined ? `${pose.shoulder_asymmetry}` : '-';
+
+                document.getElementById('eye-blink-count').textContent = eye.blink_count ?? 0;
+                document.getElementById('eye-blink-rate').textContent = eye.blink_rate_per_min !== undefined ? `${eye.blink_rate_per_min} / min` : '-';
+                document.getElementById('eye-ear').textContent = eye.eye_aspect_ratio !== undefined ? eye.eye_aspect_ratio : '-';
+
+                document.getElementById('gesture-hand-count').textContent = gesture.hand_count ?? 0;
+                const gestureFaceEl = document.getElementById('gesture-hand-face');
+                setBadgeState(gestureFaceEl, gesture.hand_near_face ? 'alert' : 'inactive', gesture.hand_near_face ? 'Near Face' : 'Clear');
+
+                const audio = stats.audio || {};
+                const audioCurrent = audio.current || {};
+                const audioBaseline = audio.baseline_stats || {};
+
+                setBadgeState(document.getElementById('audio-status'), audio.available ? 'active' : 'inactive', audio.available ? 'Active' : 'Inactive');
+
+                const energyVal = formatNumber(audioCurrent.energy, 3);
+                document.getElementById('audio-energy').textContent = energyVal;
+
+                const pitchVal = formatNumber(audioCurrent.pitch_hz, 1);
+                document.getElementById('audio-pitch').textContent = pitchVal;
+
+                const speechRateVal = formatNumber(audioCurrent.speech_rate_per_min, 2);
+                document.getElementById('audio-speech-rate').textContent = speechRateVal === '-' ? '-' : `${speechRateVal} / min`;
+
+                const tremorVal = formatNumber(audioCurrent.voice_tremor, 3);
+                document.getElementById('audio-tremor').textContent = tremorVal;
+
+                const voiceActivityBadge = document.getElementById('audio-activity');
+                if (audioCurrent.voice_activity === undefined) {
+                    setBadgeState(voiceActivityBadge, 'inactive', 'Calm');
+                } else if (audioCurrent.voice_activity) {
+                    setBadgeState(voiceActivityBadge, 'active', 'Detected');
+                } else {
+                    setBadgeState(voiceActivityBadge, 'inactive', 'Calm');
+                }
+
+                const baselineEnergy = formatNumber(audioBaseline.energy_avg, 3);
+                document.getElementById('audio-baseline-energy').textContent = baselineEnergy;
+                document.getElementById('audio-baseline-count').textContent = audioBaseline.sample_count ?? 0;
+
+                document.getElementById('time-elapsed').textContent = stats.time_elapsed;
+                document.getElementById('quick-audio-count').textContent = audio.log_samples ?? 0;
+
+                if (stats.baseline_captured) {
+                    setBadgeState(document.getElementById('quick-baseline'), 'active', 'Captured');
+                }
+                
+            } catch (error) {
+                console.error('Failed to update stats:', error);
+            }
+        }
+        
+
+        async function updateGraph() {
+            try {
+                const response = await fetch(`${API_BASE}/get_emotion_timeline`);
+                const graphData = await response.json();
+                
+                if (graphData.labels && graphData.labels.length > 0) {
+                    emotionChart.data.labels = graphData.labels;
+                    
+ 
+                    graphData.datasets.forEach((dataset, index) => {
+                        if (emotionChart.data.datasets[index]) {
+                            emotionChart.data.datasets[index].data = dataset.data;
+                            emotionChart.data.datasets[index].label = dataset.label;
+                        }
+                    });
+                    
+                    emotionChart.update('none'); 
+                }
+            } catch (error) {
+                console.error('Failed to update graph:', error);
+            }
+        }
+        
+
+        window.onload = () => {
+            initChart();
+            console.log('Frontend initialized. Backend API:', API_BASE);
+        };
+    </script>
+</body>
+</html>

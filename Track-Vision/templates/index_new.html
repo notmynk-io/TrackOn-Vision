@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FaceRecon - Neon 3D Interface</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style_new.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rubik:wght@300;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <main class="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 class="neon-title">FACERECON</h1>
+            <p class="subtitle">Real-Time Face Recognition System</p>
+        </header>
+
+        <!-- Main Content -->
+        <section class="top">
+            <!-- Video Stage -->
+            <div class="stage">
+                <div class="stage-glow"></div>
+                <div class="stage-inner">
+                    <div class="rec" id="recIndicator">IDLE</div>
+                    <div class="camera-icon">📹</div>
+                    <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video Feed" class="video-stream">
+                    <div class="focus-box"></div>
+                    <div class="status-overlay" id="statusOverlay">Upload reference photo to start</div>
+                </div>
+            </div>
+
+            <!-- Side Control Panel -->
+            <aside class="side-panel">
+                <!-- Reference Photo Preview -->
+                <div class="preview">
+                    <div class="preview-inner" id="previewInner">
+                        <div class="preview-placeholder">No Reference Photo</div>
+                    </div>
+                    <div class="face-dot">🎯</div>
+                </div>
+
+                <!-- Main Controls -->
+                <div class="controls">
+                    <button id="uploadBtn" class="btn neon green">
+                        <span>📤 UPLOAD</span>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    </button>
+                    <button id="clearBtn" class="btn neon red">🗑️ CLEAR</button>
+                </div>
+
+                <!-- Tolerance Control -->
+                <div class="tolerance-control">
+                    <label for="tolerance">Match Tolerance: <span id="toleranceValue">0.6</span></label>
+                    <input type="range" id="tolerance" min="0.4" max="0.7" step="0.05" value="0.6">
+                    <small>Lower = Stricter</small>
+                </div>
+            </aside>
+        </section>
+
+        <!-- Camera Controls Section -->
+        <section class="camera-controls">
+            <div class="control-group">
+                <label for="cameraType">Camera Type:</label>
+                <select id="cameraType" class="neon-select">
+                    <option value="webcam">Webcam</option>
+                    <option value="ip">IP Camera</option>
+                </select>
+            </div>
+
+            <div class="control-group" id="ipUrlGroup" style="display: none;">
+                <label for="ipUrl">IP Camera URL:</label>
+                <input type="text" id="ipUrl" class="neon-input" placeholder="rtsp://username:password@ip:port/stream">
+            </div>
+
+            <div class="control-group">
+                <button id="startCameraBtn" class="btn neon blue">▶️ START CAMERA</button>
+                <button id="stopCameraBtn" class="btn neon red" disabled>⏹️ STOP CAMERA</button>
+                <button id="toggleProcessingBtn" class="btn neon yellow" disabled>🔄 START PROCESSING</button>
+            </div>
+        </section>
+
+        <!-- Statistics Section -->
+        <section class="stats-section">
+            <div class="stats-header">
+                <h2>STATISTICS</h2>
+                <div class="stats-controls">
+                    <button id="getStatsBtn" class="btn-mini neon blue">📊 SHOW</button>
+                    <button id="resetStatsBtn" class="btn-mini neon red">🔄 RESET</button>
+                </div>
+            </div>
+            <div id="statsContent" class="stats-content">
+                <p>No statistics available yet</p>
+            </div>
+        </section>
+
+        <!-- Status Messages -->
+        <div id="statusMessages" class="status-messages"></div>
+    </main>
+
+    <script>
+        // Global state
+        let isProcessing = false;
+        let cameraRunning = false;
+        let referenceUploaded = false;
+
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const tolerance = document.getElementById('tolerance');
+        const toleranceValue = document.getElementById('toleranceValue');
+        const cameraType = document.getElementById('cameraType');
+        const ipUrlGroup = document.getElementById('ipUrlGroup');
+        const ipUrl = document.getElementById('ipUrl');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const stopCameraBtn = document.getElementById('stopCameraBtn');
+        const toggleProcessingBtn = document.getElementById('toggleProcessingBtn');
+        const getStatsBtn = document.getElementById('getStatsBtn');
+        const resetStatsBtn = document.getElementById('resetStatsBtn');
+        const previewInner = document.getElementById('previewInner');
+        const recIndicator = document.getElementById('recIndicator');
+        const statusOverlay = document.getElementById('statusOverlay');
+        const statsContent = document.getElementById('statsContent');
+
+        // Tolerance slider
+        tolerance.addEventListener('input', (e) => {
+            toleranceValue.textContent = e.target.value;
+        });
+
+        // Camera type selection
+        cameraType.addEventListener('change', (e) => {
+            ipUrlGroup.style.display = e.target.value === 'ip' ? 'block' : 'none';
+        });
+
+        // Upload button click
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // File selection
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('tolerance', tolerance.value);
+
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span>⏳ UPLOADING...</span>';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('✅ ' + data.message, 'success');
+                    
+                    // Show preview
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        previewInner.innerHTML = `<img src="${e.target.result}" alt="Reference" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+                    };
+                    reader.readAsDataURL(file);
+
+                    referenceUploaded = true;
+                    toggleProcessingBtn.disabled = !cameraRunning;
+                    statusOverlay.textContent = 'Reference loaded. Start camera to begin.';
+                } else {
+                    showMessage('❌ ' + data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Error uploading file: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<span>📤 UPLOAD</span>';
+            }
+        });
+
+        // Clear reference
+        clearBtn.addEventListener('click', () => {
+            previewInner.innerHTML = '<div class="preview-placeholder">No Reference Photo</div>';
+            fileInput.value = '';
+            referenceUploaded = false;
+            toggleProcessingBtn.disabled = true;
+            isProcessing = false;
+            toggleProcessingBtn.innerHTML = '🔄 START PROCESSING';
+            statusOverlay.textContent = 'Upload reference photo to start';
+            showMessage('🗑️ Reference photo cleared', 'info');
+        });
+
+        // Start camera
+        startCameraBtn.addEventListener('click', async () => {
+            startCameraBtn.disabled = true;
+            startCameraBtn.innerHTML = '⏳ STARTING...';
+
+            try {
+                const response = await fetch('/start_camera', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        camera_type: cameraType.value,
+                        ip_url: ipUrl.value || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('✅ ' + data.message, 'success');
+                    cameraRunning = true;
+                    stopCameraBtn.disabled = false;
+                    startCameraBtn.disabled = true;
+                    recIndicator.textContent = 'LIVE';
+                    recIndicator.style.color = '#00ffa8';
+                    
+                    if (referenceUploaded) {
+                        toggleProcessingBtn.disabled = false;
+                    }
+                } else {
+                    showMessage('❌ ' + data.message, 'error');
+                    startCameraBtn.disabled = false;
+                }
+            } catch (error) {
+                showMessage('❌ Error starting camera: ' + error.message, 'error');
+                startCameraBtn.disabled = false;
+            } finally {
+                startCameraBtn.innerHTML = '▶️ START CAMERA';
+            }
+        });
+
+        // Stop camera
+        stopCameraBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/stop_camera', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('⏹️ ' + data.message, 'info');
+                    cameraRunning = false;
+                    startCameraBtn.disabled = false;
+                    stopCameraBtn.disabled = true;
+                    toggleProcessingBtn.disabled = true;
+                    recIndicator.textContent = 'IDLE';
+                    recIndicator.style.color = '#ff4f7b';
+                    isProcessing = false;
+                    toggleProcessingBtn.innerHTML = '🔄 START PROCESSING';
+                } else {
+                    showMessage('❌ ' + data.message, 'error');
+                }
+            } catch (error) {
+                showMessage('❌ Error stopping camera: ' + error.message, 'error');
+            }
+        });
+
+        // Toggle processing
+        toggleProcessingBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/toggle_processing', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    isProcessing = data.is_processing;
+                    toggleProcessingBtn.innerHTML = isProcessing ? '⏸️ STOP PROCESSING' : '🔄 START PROCESSING';
+                    recIndicator.textContent = isProcessing ? 'PROCESSING' : 'LIVE';
+                    statusOverlay.textContent = isProcessing ? 'Searching for matches...' : 'Processing paused';
+                    showMessage(isProcessing ? '▶️ Processing started' : '⏸️ Processing paused', 'info');
+                }
+            } catch (error) {
+                showMessage('❌ Error toggling processing: ' + error.message, 'error');
+            }
+        });
+
+        // Get statistics
+        getStatsBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/get_stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.stats;
+                    statsContent.innerHTML = `
+                        <div class="stat-item"><span class="stat-label">Total Frames:</span> <span class="stat-value">${stats.total_frames_processed}</span></div>
+                        <div class="stat-item"><span class="stat-label">Faces Detected:</span> <span class="stat-value">${stats.total_faces_detected}</span></div>
+                        <div class="stat-item"><span class="stat-label">Matches Found:</span> <span class="stat-value">${stats.total_matches_found}</span></div>
+                        <div class="stat-item"><span class="stat-label">Avg Processing Time:</span> <span class="stat-value">${stats.avg_processing_time.toFixed(3)}s</span></div>
+                        <div class="stat-item"><span class="stat-label">Match Rate:</span> <span class="stat-value">${stats.match_rate.toFixed(2)}%</span></div>
+                    `;
+                } else {
+                    statsContent.innerHTML = '<p>No statistics available</p>';
+                }
+            } catch (error) {
+                showMessage('❌ Error fetching statistics: ' + error.message, 'error');
+            }
+        });
+
+        // Reset statistics
+        resetStatsBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/reset_stats', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showMessage('🔄 Statistics reset', 'success');
+                    statsContent.innerHTML = '<p>Statistics reset. Start processing to collect new data.</p>';
+                }
+            } catch (error) {
+                showMessage('❌ Error resetting statistics: ' + error.message, 'error');
+            }
+        });
+
+        // Show message function
+        function showMessage(message, type) {
+            const messagesDiv = document.getElementById('statusMessages');
+            const messageEl = document.createElement('div');
+            messageEl.className = `status-message ${type}`;
+            messageEl.textContent = message;
+            messagesDiv.appendChild(messageEl);
+
+            setTimeout(() => {
+                messageEl.style.opacity = '0';
+                setTimeout(() => messageEl.remove(), 300);
+            }, 3000);
+        }
+
+        // Auto-refresh stats every 5 seconds if processing
+        setInterval(() => {
+            if (isProcessing && statsContent.querySelector('.stat-item')) {
+                getStatsBtn.click();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

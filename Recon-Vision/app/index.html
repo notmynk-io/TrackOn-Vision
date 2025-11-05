@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BORDER SURVEILLANCE SYSTEM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Electrolize&family=Montserrat:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style/style.css">
+</head>
+<body>
+    <audio id="alertSound" src="audio/sound.mp3" preload="auto"></audio>
+
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">// BORDER SURVEILLANCE SYSTEM //</h1>
+            <nav class="nav">
+                <ul>
+                    <li><a href="#live-feed">Live Feed</a></li>
+                    <li><a href="#alerts">Threat Alerts</a></li>
+                    <li><a href="#stats">Detection Stats</a></li>
+                    <li><a href="#">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section id="system-dashboard" class="dashboard-section">
+            <div class="container dashboard-grid">
+                
+                <div class="left-sidebar">
+                    <div class="card alerts-section">
+                        <h2>| THREAT ALERTS |</h2>
+                        <div class="alerts-list" id="alerts">
+                            <p class="initial-message">SYSTEM ONLINE. MONITORING...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="center-content">
+                    <div class="card video-section">
+                        <h2>LIVE FEED || CAMERA 1</h2>
+                        <div class="video-container">
+                            <img id="video-feed" src="http://localhost:8000/video_feed" alt="Live Video Feed" class="live-video">
+                            <div class="overlay-status" id="connection-status">
+                                <span class="status-indicator online"></span> System Online
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-sidebar">
+                    <div class="card stats-section">
+                        <h4>| DETECTION STATS |</h4>
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th>CLASS</th>
+                                    <th>COUNT</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-body">
+                                <tr>
+                                    <td>PERSON</td>
+                                    <td id="person-count">0</td>
+                                </tr>
+                                <tr>
+                                    <td>BIRD</td>
+                                    <td id="bird-count">0</td>
+                                </tr>
+                                <tr>
+                                    <td>ANIMAL</td>
+                                    <td id="animal-count">0</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 B.S.C. // INTRUDER DETECTION SYSTEM. POWERED BY YOLOV8 ENGINE & HARDWORK.</p>
+        </div>
+    </footer>
+
+    <script>
+        const alertsContainer = document.getElementById('alerts');
+        const personCountElem = document.getElementById('person-count');
+        const birdCountElem = document.getElementById('bird-count');
+        const animalCountElem = document.getElementById('animal-count');
+        const alertSound = document.getElementById('alertSound');
+        const connectionStatus = document.getElementById('connection-status');
+        let initialMessageDisplayed = true;
+
+        function connectWebSocket() {
+            const socket = new WebSocket('ws://localhost:8000/ws');
+
+            socket.onopen = function(event) {
+                console.log('WebSocket connection established.');
+                connectionStatus.innerHTML = '<span class="status-indicator online"></span> System Online';
+                connectionStatus.classList.remove('offline', 'error');
+                connectionStatus.classList.add('online');
+            };
+
+            socket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                
+                if (message.type === 'alert') {
+                    handleAlert(message);
+                } else if (message.type === 'stats') {
+                    handleStats(message.data);
+                }
+            };
+
+            socket.onclose = function(event) {
+                console.log('WebSocket connection closed.', event);
+                connectionStatus.innerHTML = '<span class="status-indicator offline"></span> Connection Lost. Reconnecting...';
+                connectionStatus.classList.remove('online', 'error');
+                connectionStatus.classList.add('offline');
+                setTimeout(connectWebSocket, 5000); 
+            };
+
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                connectionStatus.innerHTML = '<span class="status-indicator error"></span> Connection Error. Reconnecting...';
+                connectionStatus.classList.remove('online', 'offline');
+                connectionStatus.classList.add('error');
+                socket.close(); 
+            };
+        }
+
+        function handleAlert(alertData) {
+            if (initialMessageDisplayed) {
+                alertsContainer.innerHTML = '';
+                initialMessageDisplayed = false;
+            }
+
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert-item';
+
+            const details = alertData.details && alertData.details.length > 0 ? alertData.details[0] : null;
+            const confidence = details ? details.confidence.toFixed(2) : 'N/A';
+            const timestamp = new Date().toLocaleTimeString();
+
+            alertDiv.innerHTML = `
+                <div class="alert-header">
+                    <span class="alert-timestamp">${timestamp}</span>
+                    <span class="alert-message">ALERT: HUMAN INTRUDER DETECTED!</span>
+                </div>
+                <div class="alert-details">
+                    <img src="${alertData.image_url}" alt="Intruder Snapshot" class="intruder-image" />
+                    <p>Confidence: <span class="confidence">${(parseFloat(confidence) * 100).toFixed(2)}%</span></p>
+                </div>
+            `;
+
+            alertsContainer.prepend(alertDiv);
+            alertSound.play().catch(e => console.error("Audio play failed:", e));
+        }
+
+        function handleStats(statsData) {
+            personCountElem.textContent = statsData.person !== undefined ? statsData.person : '0';
+            birdCountElem.textContent = statsData.bird !== undefined ? statsData.bird : '0';
+            animalCountElem.textContent = statsData.animal !== undefined ? statsData.animal : '0';
+        }
+
+        connectWebSocket();
+    </script>
+</body>
+</html>

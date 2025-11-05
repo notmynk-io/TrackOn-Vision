@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="css/style.css">
+<title>B.S.C. // INTRUDER DETECTION SYSTEM</title>
+</head>
+<body>
+
+<header>// BORDER SURVEILLANCE SYSTEM // INTRUDER DETECTION SYSTEM //</header>
+
+<main>
+  <section class="video-section panel">
+    <h2>// LIVE FEED // SECTOR 7G</h2>
+    <img id="video-feed" src="http://localhost:8000/video_feed" alt="Live video stream" />
+  </section>
+
+  <section class="right-panel">
+    <section class="alerts-section panel">
+      <h2>// THREAT ALERTS //</h2>
+      <div id="alerts">SYSTEM ONLINE. MONITORING...</div>
+    </section>
+
+    <section class="stats-section panel">
+      <h3>// DETECTION STATS //</h3>
+      <table id="stats-table">
+        <thead>
+          <tr><th>CLASS</th><th>COUNT</th></tr>
+        </thead>
+        <tbody id="stats-body">
+          <tr><td>PERSON</td><td id="person-count">0</td></tr>
+          <tr><td>BIRD</td><td id="bird-count">0</td></tr>
+          <tr><td>ANIMAL</td><td id="animal-count">0</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </section>
+</main>
+
+<footer>STATUS: OPERATIONAL | POWERED BY YOLOV8 ENGINE & HARDWORK </footer>
+
+<audio id="alert-sound" src="warning.mp3" preload="auto"></audio>
+
+<script>
+  const alertsContainer = document.getElementById('alerts');
+  const personCountElem = document.getElementById('person-count');
+  const birdCountElem = document.getElementById('bird-count');
+  const animalCountElem = document.getElementById('animal-count');
+  const alertSound = document.getElementById('alert-sound');
+
+  const socket = new WebSocket("ws://localhost:8000/ws");
+
+  socket.onopen = function(event) {
+    console.log("WebSocket connection established.");
+  };
+
+  socket.onmessage = function(event) {
+    const message = JSON.parse(event.data);
+
+    if (message.type === 'alert') {
+      handleAlert(message);
+    } else if (message.type === 'stats') {
+      handleStats(message.data);
+    }
+  };
+
+  socket.onclose = function(event) {
+    console.log("WebSocket connection closed.");
+    alertsContainer.innerHTML = '<div class="alert-item">CONNECTION LOST. REFRESH REQUIRED.</div>';
+  };
+
+  socket.onerror = function(error) {
+    console.error("WebSocket error:", error);
+    alertsContainer.innerHTML = '<div class="alert-item">CONNECTION ERROR.</div>';
+  };
+
+  let isFirstAlert = true;
+
+  function handleAlert(alertData) {
+    if (isFirstAlert) {
+        alertsContainer.innerHTML = ""; // Clear the 'monitoring' message
+        isFirstAlert = false;
+    }
+
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert-item';
+
+    const timestamp = new Date().toLocaleString();
+    const confidence = alertData.details[0].confidence.toFixed(2);
+
+    alertDiv.innerHTML = `
+        <div class="timestamp">${timestamp}</div>
+        <div class="alert-text">ALERT: HUMAN INTRUDER DETECTED. CONF: ${confidence}</div>
+        <img class="intruder-image" src="${alertData.image_url}" alt="Intruder Snapshot" />
+    `;
+
+    alertsContainer.prepend(alertDiv);
+
+    alertSound.play().catch(e => console.error("Audio play failed:", e));
+  }
+
+  function handleStats(statsData) {
+    personCountElem.textContent = statsData.person;
+    birdCountElem.textContent = statsData.bird;
+    animalCountElem.textContent = statsData.animal;
+  }
+</script>
+
+</body>
+</html>
