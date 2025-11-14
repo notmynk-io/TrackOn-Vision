@@ -10,27 +10,6 @@
 
 > *Securing borders, tracking criminals, and delivering scientific justice through indigenous AI technology.*
 
----
-
-## 📋 Table of Contents
-
-- [About](#about)
-- [Features](#features)
-- [System Modules](#system-modules)
-- [Technology Stack](#technology-stack)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Project Structure](#project-structure)
-- [Screenshots](#screenshots)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
-
----
-
 ## 🎯 About
 
 **TrackOn Vision** is an indigenous AI-powered security platform developed to support India's defence and law enforcement agencies. Built entirely with open-source technologies, it provides three integrated modules for comprehensive security operations:
